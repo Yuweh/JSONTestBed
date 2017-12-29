@@ -16,14 +16,16 @@ struct AtmDetailsStruct {
     
     private(set) public var atmName : String
     private(set) public var atmLocation : String
+    private(set) public var atmDistance : String
     
-    init(atmName: String, atmLocation: String) {
+    init(atmName: String, atmLocation: String, atmDistance: String) {
         self.atmName = atmName
         self.atmLocation = atmLocation
-        
+        self.atmDistance = atmDistance
     }
-    
 }
+
+/***************************************************************/
 
 class MainMapVC: UIViewController, newLocationsDelegate {
     
@@ -100,15 +102,25 @@ class MainMapVC: UIViewController, newLocationsDelegate {
             let longitude = coordinates["lng"] as! CLLocationDegrees
             let latitude = coordinates["lat"] as! CLLocationDegrees
             
-            let itemLocation = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+            let itemLocation = CLLocationCoordinate2D(latitude: currentLocation.coordinate.latitude, longitude: currentLocation.coordinate.longitude)
+            
+            // to compute distance from current location and atm coordinates
+            
+            let atmLocation = CLLocation(latitude: latitude, longitude: longitude)
+            let userLocation = currentLocation
+            let distanceMeters = userLocation?.distance(from: atmLocation)
+            let distanceKilometers = distanceMeters! / 1000.00
+            let atmCoordinatesDistance = String(Double(round(100 * distanceKilometers) / 100)) + " km"
             
             // for atmDetailsArray
             
             let atmName = dict["name"] as! String
             let atmAddress = dict["vicinity"] as! String
+            let atmDistance = atmCoordinatesDistance
             
-            let atmInfo = AtmDetailsStruct(atmName: atmName, atmLocation: atmAddress)
-            print(atmInfo)
+            let atmInfo = AtmDetailsStruct(atmName: atmName, atmLocation: atmAddress, atmDistance: atmDistance)
+            print(atmInfo) //*un/comment to/not test feed
+            
             
             atmDetailsArray.append(atmInfo)
             locationCoordinates.addObjects(from: [itemLocation])
@@ -182,7 +194,7 @@ extension MainMapVC: CLLocationManagerDelegate {
             mapView.camera = GMSCameraPosition(target: location.coordinate, zoom: 15, bearing: 0, viewingAngle: 0)
             mapView.animate(toLocation: location.coordinate)
             self.updateNearbyLocations(currentLocation: location)
-
+            currentLocation = CLLocation(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude)
         }
     }
 }
@@ -198,7 +210,7 @@ extension MainMapVC: GMSMapViewDelegate {
 extension MainMapVC: UITableViewDelegate, UITableViewDataSource {
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "cell", for: indexPath)
+        let cell: ATMCustomCell = tableView.dequeueReusableCell(withIdentifier: "ATMcell", for: indexPath) as! ATMCustomCell
         let atmDetailsInfo = atmDetailsArray[indexPath.row]
         cell.textLabel?.text = atmDetailsInfo.atmName
         cell.textLabel?.text = atmDetailsInfo.atmLocation
