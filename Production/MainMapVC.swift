@@ -31,7 +31,7 @@ struct AtmDetailsStruct {
 class MainMapVC: UIViewController, newLocationsDelegate {
     
     var currentLocation: CLLocation! // This is our current location
-    let locationManager = CLLocationManager() // Manage our location
+    var locationManager = CLLocationManager() // Manage our location
     
     // Store the location coordinates of the nearby locations
     var locationCoordinates = NSMutableArray()
@@ -39,7 +39,6 @@ class MainMapVC: UIViewController, newLocationsDelegate {
     
     
     //Props
-    
     @IBOutlet weak var mapView: GMSMapView!
     @IBOutlet weak var atmTableView: UITableView!
     @IBOutlet weak var locationLabel: UILabel!
@@ -55,12 +54,13 @@ class MainMapVC: UIViewController, newLocationsDelegate {
         SearchNearbyManager.sharedInstance.delegate = self;
         // Only show the location label if we know our current location and address
         self.updateLocationLabel(text: "")
+        self.atmDetailsArray.removeAll()
         print("**** ViewDidLoad ****")
     }
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        atmTableView.reloadData()
+        self.atmTableView.reloadData()
         print("**** ViewWillAppear ****")
     }
     
@@ -108,7 +108,6 @@ class MainMapVC: UIViewController, newLocationsDelegate {
             
             
             // for atmDetailsArray
-            
             let atmName = dict["name"] as! String
             let atmAddress = dict["vicinity"] as! String
             
@@ -173,24 +172,21 @@ class MainMapVC: UIViewController, newLocationsDelegate {
     }
     
     func appendAtmDetailsArray(atmStruct: AtmDetailsStruct) {
-        
+        //self.atmDetailsArray.removeAll()
         let atmStructInfo = atmStruct
         self.atmDetailsArray.append(atmStructInfo)
         print(atmDetailsArray.count)
-        
         self.atmTableView.reloadData()
         
         // TODO Remove this check
         if self.atmDetailsArray.count <= 20 {
             print("***************************** RECEIVED 1 API Locations for ATM Details Array **********************************")
         } else {
-            print("***************************** Google Maps Services Currently Unavailable, pls. contact customer support **********************************")
+            print("***************************** RECEIVED >20 API Locations for ATM Details Array **********************************")
         }
     }
-    
-    
+        
 }
-
 
 
     /***************************************************************/
@@ -219,7 +215,6 @@ extension MainMapVC: CLLocationManagerDelegate {
             mapView.camera = GMSCameraPosition(target: location.coordinate, zoom: 15, bearing: 0, viewingAngle: 0)
             mapView.animate(toLocation: location.coordinate)
             self.updateNearbyLocations(currentLocation: location)
-            print("***************************** updateNearbyLocations from locationManager did updateLocations trigerred **********************************")
             currentLocation = CLLocation(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude)
             locationManager.stopUpdatingLocation()
             locationManager.delegate = nil
@@ -233,7 +228,6 @@ extension MainMapVC: CLLocationManagerDelegate {
 extension MainMapVC: GMSMapViewDelegate {
     
     func mapView(_ mapView: GMSMapView, idleAt position: GMSCameraPosition) {
-        
         reverseGeocodeCoordinate(coordinate: position.target)
     }
 }
@@ -248,7 +242,6 @@ extension MainMapVC: UITableViewDelegate, UITableViewDataSource {
         cell.textLabel?.text = atmDetailsInfo.atmName
         cell.detailTextLabel?.text = atmDetailsInfo.atmLocation
         cell.textLabel?.text = atmDetailsInfo.atmDistance
-
         return cell
     }
 
@@ -258,7 +251,6 @@ extension MainMapVC: UITableViewDelegate, UITableViewDataSource {
     }
     
     func numberOfSections(in tableView: UITableView) -> Int {
-
         return 1
     }
     
@@ -272,30 +264,29 @@ extension MainMapVC: GMSAutocompleteViewControllerDelegate {
         let newCurrentLocation = CLLocation(latitude: place.coordinate.latitude, longitude: place.coordinate.longitude)
         self.updateNearbyLocations(currentLocation: newCurrentLocation)
                 mapView.camera = GMSCameraPosition(target: newCurrentLocation.coordinate, zoom: 15, bearing: 0, viewingAngle: 0)
+        self.currentLocation = CLLocation(latitude: newCurrentLocation.coordinate.latitude, longitude: newCurrentLocation.coordinate.longitude)
+        self.atmDetailsArray.removeAll()
         dismiss(animated: true, completion: nil)
-        print("EXPERIMENTAL AUTOCOMPLETE  - didAutocompleteWith")
+        locationManager.stopUpdatingLocation()
+        locationManager.delegate = nil
     }
     
     func viewController(_ viewController: GMSAutocompleteViewController, didFailAutocompleteWithError error: Error) {
-        print("EXPERIMENTAL AUTOCOMPLETE - Error")
         print("Error: ", error.localizedDescription)
     }
     
     // User canceled the operation.
     func wasCancelled(_ viewController: GMSAutocompleteViewController) {
         dismiss(animated: true, completion: nil)
-        print("EXPERIMENTAL AUTOCOMPLETE - wasCancelled")
     }
     
     // Turn the network activity indicator on and off again.
     func didRequestAutocompletePredictions(_ viewController: GMSAutocompleteViewController) {
         //UIApplication.shared.isNetworkActivityIndicatorVisible = true
-        print("phase 5.1 - didRequestAutocompletePredictions")
     }
     
     func didUpdateAutocompletePredictions(_ viewController: GMSAutocompleteViewController) {
         //UIApplication.shared.isNetworkActivityIndicatorVisible = false
-        print("phase 5.2 - didUpdateAutocompletePredictions")
     }
     
 }
