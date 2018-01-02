@@ -14,9 +14,9 @@ import GooglePlacePicker
 
 struct AtmDetailsStruct {
     
-    private(set) public var atmName : String
-    private(set) public var atmLocation : String
-    private(set) public var atmDistance : String
+    private(set) public var atmName : String = ""
+    private(set) public var atmLocation : String = ""
+    private(set) public var atmDistance : String = ""
     //
     
     init(atmName: String, atmLocation: String, atmDistance: String) {
@@ -37,23 +37,33 @@ class MainMapVC: UIViewController, newLocationsDelegate {
     var locationCoordinates = NSMutableArray()
     var atmDetailsArray: [AtmDetailsStruct] = [AtmDetailsStruct]()
     
+    
     //Props
+    
     @IBOutlet weak var mapView: GMSMapView!
     @IBOutlet weak var atmTableView: UITableView!
     @IBOutlet weak var locationLabel: UILabel!
- 
+    
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        atmTableView.delegate = self
+        atmTableView.dataSource = self
         locationManager.delegate = self
         locationManager.requestWhenInUseAuthorization()
         mapView.delegate = self
         SearchNearbyManager.sharedInstance.delegate = self;
-        atmTableView.delegate = self as! UITableViewDelegate
-        atmTableView.dataSource = self as! UITableViewDataSource
         // Only show the location label if we know our current location and address
         self.updateLocationLabel(text: "")
+        print("**** ViewDidLoad ****")
     }
+    
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        atmTableView.reloadData()
+        print("**** ViewWillAppear ****")
+    }
+    
         /***************************************************************/
     
     //AutocompletePicker methods
@@ -94,7 +104,13 @@ class MainMapVC: UIViewController, newLocationsDelegate {
             let latitude = coordinates["lat"] as! CLLocationDegrees
             
             let itemLocation = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+            //print(locations.count)
             
+            
+            // for atmDetailsArray
+            
+            let atmName = dict["name"] as! String
+            let atmAddress = dict["vicinity"] as! String
             
             // to compute distance from current location and atm coordinates
             
@@ -104,23 +120,17 @@ class MainMapVC: UIViewController, newLocationsDelegate {
             
             let distanceMeters = userLocation.distance(from: atmLocation)
             let distanceKilometers = distanceMeters / 1000.00
-            let atmCoordinatesDistance = String(Double(round(100 * distanceKilometers) / 100)) + " KM"
+            let atmCoordinatesDistance = String(Double(round(100 * distanceKilometers) / 100)) + " KM :  " + atmName
             
-            // for atmDetailsArray
-            
-            let atmName = dict["name"] as! String
-            let atmAddress = dict["vicinity"] as! String
-            //let atmDistance = atmCoordinatesDistance
             
             let atmInfo = AtmDetailsStruct(atmName: atmName, atmLocation: atmAddress, atmDistance: atmCoordinatesDistance)
-            //print(atmInfo) //*un/comment to/not test feed
+            print(atmInfo) //*un/comment to/not test feed
             
-    
+            //self.updateAtmDetailsArray(name: atmName, address: atmAddress, distance: atmCoordinatesDistance)
+            self.appendAtmDetailsArray(atmStruct: atmInfo)
+            
             // to populate variables above
-            
-            atmDetailsArray.append(atmInfo)
             locationCoordinates.addObjects(from: [itemLocation])
-            
             let marker = GMSMarker(position: itemLocation)
             marker.title = dict["name"] as? String
             marker.map = mapView
@@ -129,13 +139,10 @@ class MainMapVC: UIViewController, newLocationsDelegate {
     
     func updateNearbyLocations(currentLocation: CLLocation) {
         SearchNearbyManager.sharedInstance.getNearbyLocationsWithLocation(location: currentLocation)
-        print("***************************** updateNearbyLocations from MainMapVC triggerred **********************************")
     }
     
     func updateLocationLabel(text: String) {
-        
         self.locationLabel.text = text
-        
         UIView.animate(withDuration: 0.2, animations: {
             //self.locationLabel.alpha = self.locationLabel.text?.count = 0 ? 0.0 : 0.7
         })
@@ -145,35 +152,53 @@ class MainMapVC: UIViewController, newLocationsDelegate {
     func reverseGeocodeCoordinate(coordinate: CLLocationCoordinate2D) {
         
         let geocoder = GMSGeocoder()
-        
         geocoder.reverseGeocodeCoordinate(coordinate) { response, error in
-            
             if let address = response?.firstResult() {
-                
                 var addressString = String()
-                
                 // Concatinate the lines of the address into a single string
                 for String in address.lines! {
                     addressString = addressString + " " + String
                 }
-                
                 self.updateLocationLabel(text: addressString)
             }
         }
     }
+   
+    /***************************************************************/
+    
+    func updateAtmDetailsArray(name: String, address: String, distance: String) {
+        self.atmDetailsArray.removeAll()
+        let atmInfo = AtmDetailsStruct(atmName: name, atmLocation: address, atmDistance: distance)
+        self.appendAtmDetailsArray(atmStruct: atmInfo)
+    }
+    
+    func appendAtmDetailsArray(atmStruct: AtmDetailsStruct) {
+        
+        let atmStructInfo = atmStruct
+        self.atmDetailsArray.append(atmStructInfo)
+        print(atmDetailsArray.count)
+        
+        self.atmTableView.reloadData()
+        
+        // TODO Remove this check
+        if self.atmDetailsArray.count <= 20 {
+            print("***************************** RECEIVED 1 API Locations for ATM Details Array **********************************")
+        } else {
+            print("***************************** Google Maps Services Currently Unavailable, pls. contact customer support **********************************")
+        }
+    }
+    
     
 }
 
 
-    /***************************************************************/
 
+    /***************************************************************/
 
 extension MainMapVC: CLLocationManagerDelegate {
     
     func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
-        
         if status == .authorizedWhenInUse {
-            
             locationManager.startUpdatingLocation()
             mapView.isMyLocationEnabled = true
             mapView.settings.myLocationButton = true
@@ -198,6 +223,7 @@ extension MainMapVC: CLLocationManagerDelegate {
             currentLocation = CLLocation(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude)
             locationManager.stopUpdatingLocation()
             locationManager.delegate = nil
+            
         }
     }
 }
@@ -217,25 +243,23 @@ extension MainMapVC: GMSMapViewDelegate {
 extension MainMapVC: UITableViewDelegate, UITableViewDataSource {
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell: ATMCustomCell = tableView.dequeueReusableCell(withIdentifier: "ATMcell", for: indexPath) as! ATMCustomCell
+        let cell = tableView.dequeueReusableCell(withIdentifier: "cell", for: indexPath)
         let atmDetailsInfo = atmDetailsArray[indexPath.row]
         cell.textLabel?.text = atmDetailsInfo.atmName
-        cell.textLabel?.text = atmDetailsInfo.atmLocation
+        cell.detailTextLabel?.text = atmDetailsInfo.atmLocation
         cell.textLabel?.text = atmDetailsInfo.atmDistance
-        print(atmDetailsInfo) //*un/comment to/not test feed
-        
-//        cell.textLabel?.text = atmDetailsInfo.atmName
-//        cell.detailTextLabel?.text = atmDetailsInfo.atmLocation
+
         return cell
     }
 
     
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return 1
+        return atmDetailsArray.count
     }
     
     func numberOfSections(in tableView: UITableView) -> Int {
-        return atmDetailsArray.count
+
+        return 1
     }
     
 }
@@ -277,5 +301,5 @@ extension MainMapVC: GMSAutocompleteViewControllerDelegate {
 }
 
     /***************************************************************/
-    /***************************************************************/
-    /***************************************************************/
+    /*******************CODE ENDS HERE **********************/
+
